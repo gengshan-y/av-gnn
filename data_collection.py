@@ -150,16 +150,6 @@ with make_carla_client('localhost', 2000) as client:
                 target = positions[end_point]
                 print('%d to %d'%(start_point,end_point))
 
-                ax.clear()
-                ax.imshow(town_map)
-                pixel = carla_map.convert_to_pixel([positions[start_point].location.x,
-                                    positions[start_point].location.y,
-                                    positions[start_point].location.z])
-                ax.add_patch(Circle((pixel[0], pixel[1]), 12, color='r', label='A point'))
-                pixel = carla_map.convert_to_pixel([positions[end_point].location.x,
-                                                    positions[end_point].location.y,
-                                                    positions[end_point].location.z])
-                ax.add_patch(Circle((pixel[0], pixel[1]), 12, color='b', label='A point'))
 
                 client.start_episode(start_point)
                
@@ -187,15 +177,32 @@ with make_carla_client('localhost', 2000) as client:
                         (target.location.x, target.location.y, 22),
                         (target.orientation.x, target.orientation.y, -0.001))
 
-                    if i%10==0:
+                    if i%1==0:
+                        ax.clear()
+                        ax.imshow(town_map)
+                        pixel = carla_map.convert_to_pixel([positions[end_point].location.x,
+                                                            positions[end_point].location.y,
+                                                            positions[end_point].location.z])
+                        ax.add_patch(Circle((pixel[0], pixel[1]), 2, color=(0,0,0), label='destination'))
                         pixel = carla_map.convert_to_pixel([curr_x,curr_y,22])
-                        ax.add_patch(Circle((pixel[0], pixel[1]), 12, color='g', label='A point'))
+                        ax.add_patch(Circle((pixel[0], pixel[1]), 2, color='r', label='current'))
                         # waypoints
-                        for loc in wp_info['waypoints'][:10]:
+                        for loc in wp_info['waypoints'][::20]:
                             pixel = carla_map.convert_to_pixel([loc[0],loc[1],22])
-                            ax.add_patch(Circle((pixel[0], pixel[1]), 12, color='g', label='A point'))
+                            ax.add_patch(Circle((pixel[0], pixel[1]), 2, color='g'))
+                        for ag in measurements.non_player_agents:
+                            if ag.HasField('vehicle'):
+                                loc = [ag.vehicle.transform.location.x, ag.vehicle.transform.location.y]
+                                if sldist([curr_x, curr_y],[loc[0], loc[1]]) < 10000:
+                                    pixel = carla_map.convert_to_pixel([loc[0],loc[1],22])
+                                    ax.add_patch(Circle((pixel[0], pixel[1]), 2, color=(1,0,1), label='vehicle'))
+                            if ag.HasField('pedestrian'):
+                                loc = [ag.pedestrian.transform.location.x, ag.pedestrian.transform.location.y]
+                                if sldist([curr_x, curr_y],[loc[0], loc[1]]) < 10000:
+                                    pixel = carla_map.convert_to_pixel([loc[0],loc[1],22])
+                                    ax.add_patch(Circle((pixel[0], pixel[1]), 2, color='b', label='pedestrain'))
                         fig.canvas.draw()
-                        plt.pause(.0001)
+                        plt.savefig('data/%s/map-%05d.png'%(seq_name,i),dpi=200)
 
                     client.send_control(control)
                #     # record
@@ -218,4 +225,3 @@ with make_carla_client('localhost', 2000) as client:
                #         actual_json_text = actual_json_text[:-1] + ',"command": %d}'%int(direction)
                #         jsfile.write( actual_json_text )
                #     
-               # plt.savefig('data/%s-map.png'%seq_name)
