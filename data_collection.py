@@ -39,11 +39,34 @@ def mkdir_p(path):
 def sldist(c1, c2):
     return math.sqrt((c2[0] - c1[0])**2 + (c2[1] - c1[1])**2)
 
+
+def get_steer_noise():
+    """
+    get steering angle noise for 30 frames (3 secs)
+    """
+    direction = np.random.randint(low=0, high=2)
+    if direction == 0:
+        direction = -1
+    std = np.random.uniform(0.01, 0.03)
+    z = direction * std * np.abs(np.random.randn(15))
+    z_ = -z[::-1]
+    noise = np.cumsum(np.concatenate([z, z_]))
+    return noise
+
+
 def poses_town01():
     """
     Each matrix is a new task. We have all the four tasks
 
     """
+    def _poses_navigation2():
+            return [[19, 66], [79, 14], [19, 57], [23, 1],
+                    [53, 76], [31, 71], [33, 5],
+                    [54, 30], [10, 61], [66, 3],
+                    [79, 19], [2, 29], [16, 14], [5, 57],
+                    [46, 67], [57, 50], [61, 49], [21, 12],
+                    [56, 65]]
+
     def _poses_navigation():
             return [[19, 66], [79, 14], [19, 57], [23, 1],
                     [53, 76], [42, 13], [31, 71], [33, 5],
@@ -67,7 +90,7 @@ def poses_town01():
                 [78, 44], [68, 85], [41, 102], [95, 70], [68, 129],
                 [84, 69], [47, 79], [110, 15], [130, 17], [0, 17]]
 
-    return [_poses_navigation()]
+    return [_poses_navigation2()]
 
 # town01
 weathers = [1, 3, 6, 8, 4, 14]
@@ -109,11 +132,10 @@ for weather in weathers:
             NumberOfVehicles=vehicles,
             NumberOfPedestrians=pedestrians,
             WeatherId=weather,
-            SeedVehicles=weather*iteration,
-            SeedPedestrians=weather*iteration
             #SeedVehicles=123456789,
             #SeedPedestrians=123456789
         )
+        conditions.randomize_seeds()
         
         # Add all the cameras that were set for this experiments
         conditions.add_sensor(cam0)
@@ -182,6 +204,9 @@ with make_carla_client('localhost', 2000) as client:
                 fr_max = sldist([measurements.player_measurements.transform.location.x,
                                    measurements.player_measurements.transform.location.y],
                                       [target.location.x, target.location.y]) / 50
+
+                normal_car = True
+                count_normal = 0
                 for i in range(int(fr_max)):
                     measurements, sensor_data = client.read_data()
                     curr_x = measurements.player_measurements.transform.location.x
@@ -235,7 +260,15 @@ with make_carla_client('localhost', 2000) as client:
                  #       fig.canvas.draw()
                  #       fig.tight_layout(pad=0)
                  #       plt.savefig('data/%s/maps/%05d.png'%(seq_name,i),dpi=200)
-
+                    if normal_car and np.random.binomial(1,1./120) > 0:
+                        noise = get_steer_noise()
+                        normal_car = False
+                    if not normal_car:
+                        count_normal += 1
+                        control.steer += noise[0]
+                        noise = noise[1:]
+                        if len(noise)==0: 
+                            normal_car = True
                     client.send_control(control)
                     # record
                     im0=Image.fromarray(sensor_data['im0'].data, mode='RGB')
@@ -253,5 +286,6 @@ with make_carla_client('localhost', 2000) as client:
                         actual_json_text = actual_json_text[:-1] + ',"command": %d}'%int(direction)
                         jsfile.write( actual_json_text )
                 # draw for data
+                print('not normal: %d'%count_normal)
                 plt.savefig('data/%s-map.png'%seq_name)
                     
