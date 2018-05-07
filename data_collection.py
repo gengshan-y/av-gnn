@@ -49,7 +49,7 @@ def get_steer_noise():
         direction = -1
         std = np.random.uniform(0.01, 0.03)
     else:
-        std = np.random.uniform(0.005, 0.005)
+        std = np.random.uniform(0.01, 0.03)
     z = direction * std * np.abs(np.random.randn(15))
     z_ = -z[::-1]
     noise = np.cumsum(np.concatenate([z, z_]))
@@ -92,14 +92,16 @@ def poses_town01():
                 [78, 44], [68, 85], [41, 102], [95, 70], [68, 129],
                 [84, 69], [47, 79], [110, 15], [130, 17], [0, 17]]
 
-    return [_poses_straight(), _poses_one_curve(),_poses_navigation2()]
+    return [_poses_straight(), _poses_one_curve(),_poses_navigation()]
 
 # town01
 #weathers = [1, 3, 6, 8, 4, 14]
-weathers = [1]
+weathers = [1, 3, 6, 8, 4, 14]
 poses_tasks = poses_town01()
-vehicles_tasks = [0,0,20]
-pedestrians_tasks = [0,0,50]
+vehicles_tasks = [0,0,0]
+pedestrians_tasks = [0,0,0]
+#vehicles_tasks = [0,0,20]
+#pedestrians_tasks = [0,0,50]
 
 cam0 = carla.sensor.Camera('im0', PostProcessing='SceneFinal')
 cam0.set_image_size(1152, 384)
@@ -212,6 +214,10 @@ with make_carla_client('localhost', 2000) as client:
                 count_normal = 0
                 for i in range(int(fr_max)):
                     measurements, sensor_data = client.read_data()
+                    # jump out when collide
+                    if(measurements.player_measurements.collision_other > 1e4):
+                        print('collide')
+                        break
                     curr_x = measurements.player_measurements.transform.location.x
                     curr_y = measurements.player_measurements.transform.location.y
                     distance = sldist([curr_x, curr_y],
